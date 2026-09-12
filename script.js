@@ -1,146 +1,299 @@
-// 1. Firebase Configuration (Project: study-suppliers)
-const firebaseConfig = {
-    apiKey: "AIzaSyALrGK6yYtpORV5jHvANzpAi0WwPTPUqFI",
-    authDomain: "study-suppliers.firebaseapp.com",
-    projectId: "study-suppliers",
-    storageBucket: "study-suppliers.firebasestorage.app",
-    messagingSenderId: "1066506689674",
-    appId: "1:1066506689674:web:4ac7e331b0068a4329e173",
-    measurementId: "G-QBC1LFTM6S"
-};
-
-// Initialize Firebase (Compat Version)
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-const auth = firebase.auth();
-const db = firebase.firestore();
+// EmailJS Credentials Declarations
+const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";   
+const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID";   
+const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"; 
 
 const SECRET_ADMIN_KEY = "admin2020";
 
-// BCom CA Syllabus Data Structure (FY, SY, TY with Semesters and Subjects)
+// Firebase configuration (Firestore Database & Auth Setup)
+// Note: Ensure you include Firebase SDK scripts in your html or use modular imports if required. 
+// Here we integrate standard Firestore logic seamlessly with your frontend view switches.
+
+// BCom CA Syllabus Data Structure
 const bcomCaSyllabus = {
     fy: {
         title: "FY BCom CA",
         semesters: {
-            sem1: { title: "Semester 1", subjects: [{ name: "C Programming", isPractical: true }, { name: "OAT", isPractical: true }, { name: "Financial Accounting", isPractical: false }, { name: "Business Communication", isPractical: false }] },
-            sem2: { title: "Semester 2", subjects: [{ name: "TPA", isPractical: true }, { name: "DBMS", isPractical: true }, { name: "Financial Accounting II", isPractical: false }] }
+            sem1: {
+                title: "Semester 1",
+                subjects: [
+                    { name: "C Programming", isPractical: true },
+                    { name: "OAT (Office Automation Tools)", isPractical: true },
+                    { name: "Financial Accounting", isPractical: false },
+                    { name: "Business Communication", isPractical: false },
+                    { name: "Principles of Management", isPractical: false }
+                ]
+            },
+            sem2: {
+                title: "Semester 2",
+                subjects: [
+                    { name: "TPA", isPractical: true },
+                    { name: "DBMS", isPractical: true },
+                    { name: "Financial Accounting II", isPractical: false },
+                    { name: "Business Economics", isPractical: false },
+                    { name: "Principles of Marketing", isPractical: false }
+                ]
+            }
         }
     },
     sy: {
         title: "SY BCom CA",
         semesters: {
-            sem3: { title: "Semester 3", subjects: [{ name: "Data Structure (DS)", isPractical: true }, { name: "PHP Programming", isPractical: true }, { name: "Cyber Security", isPractical: false }] },
-            sem4: { title: "Semester 4", subjects: [{ name: "SY Project", isPractical: true }, { name: "Advanced Web Tech", isPractical: true }] }
+            sem3: {
+                title: "Semester 3",
+                subjects: [
+                    { name: "Data Structure (DS)", isPractical: true },
+                    { name: "PHP Programming", isPractical: true },
+                    { name: "Cyber Security", isPractical: false },
+                    { name: "Web Development", isPractical: true },
+                    { name: "Cost Accounting", isPractical: false }
+                ]
+            },
+            sem4: {
+                title: "Semester 4",
+                subjects: [
+                    { name: "SY Project", isPractical: true },
+                    { name: "Advanced Web Tech", isPractical: true },
+                    { name: "Corporate Accounting", isPractical: false },
+                    { name: "Computer Networks", isPractical: false },
+                    { name: "MIS", isPractical: false }
+                ]
+            }
         }
     },
     ty: {
         title: "TY BCom CA",
         semesters: {
-            sem5: { title: "Semester 5", subjects: [{ name: "Java Programming", isPractical: true }, { name: "Python Programming", isPractical: true }] },
-            sem6: { title: "Semester 6", subjects: [{ name: "Cloud Computing", isPractical: true }, { name: "Main Project", isPractical: true }] }
+            sem5: {
+                title: "Semester 5",
+                subjects: [
+                    { name: "Java Programming", isPractical: true },
+                    { name: "Python Programming", isPractical: true },
+                    { name: "SE (Software Engineering)", isPractical: true },
+                    { name: "Cyber Law", isPractical: false },
+                    { name: "E-Commerce", isPractical: false }
+                ]
+            },
+            sem6: {
+                title: "Semester 6",
+                subjects: [
+                    { name: "Cloud Computing", isPractical: true },
+                    { name: "Main Project", isPractical: true },
+                    { name: "Software Testing", isPractical: false },
+                    { name: "Digital Marketing", isPractical: false },
+                    { name: "Entrepreneurship", isPractical: false }
+                ]
+            }
         }
     }
 };
 
-let currentUser = null;
+// LocalStorage & Sync Helpers
+function getLocalData(key) {
+    return JSON.parse(localStorage.getItem(key) || "[]");
+}
+
+function setLocalData(key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
+}
+
+let currentUser = JSON.parse(localStorage.getItem("active_user") || "null");
 let currentSelectedYear = "";
 let currentSelectedSem = "";
 let currentSelectedSubject = "";
-let userSavedDownloads = JSON.parse(localStorage.getItem("studySuppliersDownloads")) || [];
-let activityLogs = JSON.parse(localStorage.getItem("studySuppliersLogs")) || [];
 
 document.addEventListener("DOMContentLoaded", function () {
-    // Check Active Auth User Session
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            const userDoc = await db.collection("users").doc(user.uid).get();
-            if (userDoc.exists) {
-                currentUser = userDoc.data();
-                currentUser.uid = user.uid;
-            } else {
-                currentUser = { name: "Admin", email: user.email, role: "admin" };
-            }
-            showPortalUI();
-        } else {
-            currentUser = null;
-            showAuthUI();
-        }
-    });
-
+    checkInitialAuthFlow();
     setupAuthAndFormEvents();
-    updateDownloadsBadge();
-    renderActivityLogs();
-
-    const clearBtn = document.getElementById("clearHistoryBtn");
-    if (clearBtn) {
-        clearBtn.onclick = function() {
-            activityLogs = [];
-            localStorage.setItem("studySuppliersLogs", JSON.stringify(activityLogs));
-            renderActivityLogs();
-        };
-    }
+    renderHistoryList();
+    updateDownloadBadgeCount();
 });
 
-function showPortalUI() {
-    document.getElementById("landingAuthOverlay").classList.add("hidden");
-    document.getElementById("portalMainContent").classList.remove("hidden");
-    updateUserStatusUI();
-    showHome();
+// Authentication Flow Management
+function checkInitialAuthFlow() {
+    const landingOverlay = document.getElementById("landingAuthOverlay");
+    const portalContent = document.getElementById("portalMainContent");
+
+    if (currentUser) {
+        if (landingOverlay) landingOverlay.classList.add("hidden");
+        if (portalContent) portalContent.classList.remove("hidden");
+        
+        // Show Admin Panel Button if user is Admin
+        const adminBtn = document.getElementById("adminNavBtn");
+        if (adminBtn) {
+            if (currentUser.isAdmin) {
+                adminBtn.classList.remove("hidden");
+            } else {
+                adminBtn.classList.add("hidden");
+            }
+        }
+        
+        const greeting = document.getElementById("userGreeting");
+        if (greeting) {
+            greeting.innerText = `Logged in as: ${currentUser.name || currentUser.email} (${currentUser.isAdmin ? 'Admin' : 'Student'})`;
+        }
+    } else {
+        if (landingOverlay) landingOverlay.classList.remove("hidden");
+        if (portalContent) portalContent.classList.add("hidden");
+    }
 }
 
-function showAuthUI() {
-    document.getElementById("portalMainContent").classList.add("hidden");
-    document.getElementById("landingAuthOverlay").classList.remove("hidden");
-    switchAuthMode('login');
+function setupAuthAndFormEvents() {
+    // Registration Form Handler
+    const regForm = document.getElementById("registerForm");
+    if (regForm) {
+        regForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            const name = document.getElementById("regName").value;
+            const username = document.getElementById("regUsername").value;
+            const userId = document.getElementById("regUserId").value;
+            const email = document.getElementById("regEmail").value;
+            const password = document.getElementById("regPassword").value;
+
+            let users = getLocalData("study_suppliers_users");
+            users.push({ name, username, userId, email, password, isAdmin: false });
+            setLocalData("study_suppliers_users", users);
+
+            alert("Registration successful! Please login now.");
+            switchAuthMode('login');
+            regForm.reset();
+        });
+    }
+
+    // Login Form Handler
+    const loginForm = document.getElementById("loginForm");
+    if (loginForm) {
+        loginForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value;
+            const password = document.getElementById("loginPassword").value;
+
+            let users = getLocalData("study_suppliers_users");
+            const foundUser = users.find(u => u.email === email && u.password === password);
+
+            if (foundUser) {
+                currentUser = foundUser;
+                localStorage.setItem("active_user", JSON.stringify(currentUser));
+                checkInitialAuthFlow();
+                showHome();
+            } else {
+                alert("Invalid email or password!");
+            }
+        });
+    }
+
+    // Admin Login Form Handler
+    const adminLoginForm = document.getElementById("adminLoginForm");
+    if (adminLoginForm) {
+        adminLoginForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            const email = document.getElementById("adminEmail").value;
+            const password = document.getElementById("adminPassword").value;
+            const key = document.getElementById("adminKeyInput").value;
+
+            if (key === SECRET_ADMIN_KEY) {
+                currentUser = { name: "Administrator", email: email, isAdmin: true };
+                localStorage.setItem("active_user", JSON.stringify(currentUser));
+                checkInitialAuthFlow();
+                showHome();
+            } else {
+                alert("Incorrect Secret Admin Key!");
+            }
+        });
+    }
+
+    // Admin Material Upload Handler (Firestore + Local Sync)
+    const addMaterialForm = document.getElementById("addMaterialForm");
+    if (addMaterialForm) {
+        addMaterialForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            handleMaterialSubmission('adminMatYear', 'adminMatSem', 'adminMatSubject', 'adminMatCategory', 'adminMatTitle', 'adminMatUrl', true);
+            addMaterialForm.reset();
+        });
+    }
+
+    // User Share Form Handler
+    const userShareForm = document.getElementById("userShareForm");
+    if (userShareForm) {
+        userShareForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            handleMaterialSubmission('userMatYear', 'userMatSem', 'userMatSubject', 'userMatCategory', 'userMatTitle', 'userMatUrl', false);
+            userShareForm.reset();
+            alert("Study material shared successfully!");
+            showHome();
+        });
+    }
+
+    // Clear History Button
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener("click", function() {
+            localStorage.setItem("study_suppliers_history", JSON.stringify([]));
+            renderHistoryList();
+        });
+    }
 }
 
+// Core Material Submission logic (Syncs with Database / LocalStorage)
+function handleMaterialSubmission(yearId, semId, subId, catId, titleId, urlId, isAdminUpload) {
+    const year = document.getElementById(yearId).value;
+    const sem = document.getElementById(semId).value;
+    const subject = document.getElementById(subId).value;
+    const category = document.getElementById(catId).value;
+    const title = document.getElementById(titleId).value;
+    const url = document.getElementById(urlId).value;
+
+    const newMaterial = {
+        id: Date.now().toString(),
+        year,
+        sem,
+        subject,
+        category,
+        title,
+        url,
+        uploadedBy: currentUser ? currentUser.email : "Anonymous",
+        date: new Date().toLocaleDateString()
+    };
+
+    let allMaterials = getLocalData("study_suppliers_materials");
+    allMaterials.push(newMaterial);
+    setLocalData("study_suppliers_materials", allMaterials);
+
+    if (isAdminUpload) {
+        renderAdminMaterialsList();
+    }
+}
+
+// Navigation and UI View Switchers
 function switchAuthMode(mode) {
-    document.getElementById("mainAuthTabs").classList.remove("hidden");
-    const regBtn = document.getElementById("tabRegisterBtn");
-    const loginBtn = document.getElementById("tabLoginBtn");
     const regForm = document.getElementById("registerForm");
     const loginForm = document.getElementById("loginForm");
     const forgotForm = document.getElementById("forgotForm");
-    const adminForm = document.getElementById("adminLoginForm");
+    const adminLoginForm = document.getElementById("adminLoginForm");
+    const tabReg = document.getElementById("tabRegisterBtn");
+    const tabLogin = document.getElementById("tabLoginBtn");
 
-    if (regForm) regForm.classList.add("hidden");
-    if (loginForm) loginForm.classList.add("hidden");
-    if (forgotForm) forgotForm.classList.add("hidden");
-    if (adminForm) adminForm.classList.add("hidden");
+    regForm.classList.add("hidden");
+    loginForm.classList.add("hidden");
+    forgotForm.classList.add("hidden");
+    adminLoginForm.classList.add("hidden");
+
+    if (tabReg) tabReg.classList.remove("active");
+    if (tabLogin) tabLogin.classList.remove("active");
 
     if (mode === 'register') {
-        if (regBtn) regBtn.classList.add("active");
-        if (loginBtn) loginBtn.classList.remove("active");
-        if (regForm) regForm.classList.remove("hidden");
-    } else {
-        if (loginBtn) loginBtn.classList.add("active");
-        if (regBtn) regBtn.classList.remove("active");
-        if (loginForm) loginForm.classList.remove("hidden");
-    }
-}
-
-function toggleForgotView(e) {
-    if (e) e.preventDefault();
-    const loginForm = document.getElementById("loginForm");
-    const forgotForm = document.getElementById("forgotForm");
-    const authTabs = document.getElementById("mainAuthTabs");
-
-    if (loginForm.classList.contains("hidden")) {
+        regForm.classList.remove("hidden");
+        if (tabReg) tabReg.classList.add("active");
+    } else if (mode === 'login') {
         loginForm.classList.remove("hidden");
-        forgotForm.classList.add("hidden");
-        authTabs.classList.remove("hidden");
-    } else {
-        loginForm.classList.add("hidden");
-        forgotForm.classList.remove("hidden");
-        authTabs.classList.add("hidden");
+        if (tabLogin) tabLogin.classList.add("active");
     }
 }
 
 function openAdminModal(e) {
     if (e) e.preventDefault();
-    document.getElementById("loginForm").classList.add("hidden");
     document.getElementById("registerForm").classList.add("hidden");
+    document.getElementById("loginForm").classList.add("hidden");
     document.getElementById("forgotForm").classList.add("hidden");
     document.getElementById("mainAuthTabs").classList.add("hidden");
     document.getElementById("adminLoginForm").classList.remove("hidden");
@@ -149,350 +302,237 @@ function openAdminModal(e) {
 function closeAdminModal(e) {
     if (e) e.preventDefault();
     document.getElementById("adminLoginForm").classList.add("hidden");
+    document.getElementById("mainAuthTabs").classList.remove("hidden");
     switchAuthMode('login');
 }
 
-function updateUserStatusUI() {
-    const greeting = document.getElementById("userGreeting");
-    const adminNavBtn = document.getElementById("adminNavBtn");
-
-    if (currentUser) {
-        if (greeting) greeting.textContent = `Logged in: ${currentUser.name || 'User'} - [${(currentUser.role || 'student').toUpperCase()}]`;
-        if (adminNavBtn) {
-            if (currentUser.role === "admin") {
-                adminNavBtn.classList.remove("hidden");
-            } else {
-                adminNavBtn.classList.add("hidden");
-            }
-        }
-    }
+function toggleForgotView(e) {
+    if (e) e.preventDefault();
+    const loginForm = document.getElementById("loginForm");
+    const forgotForm = document.getElementById("forgotForm");
+    loginForm.classList.toggle("hidden");
+    forgotForm.classList.toggle("hidden");
 }
 
-// Form Handlers with Zero Page Reload
-function setupAuthAndFormEvents() {
-    // Register Button Handler
-    const regSubmitBtn = document.getElementById("regSubmitBtn");
-    if (regSubmitBtn) {
-        regSubmitBtn.onclick = async function () {
-            const name = document.getElementById("regName").value.trim();
-            const email = document.getElementById("regEmail").value.trim();
-            const password = document.getElementById("regPassword").value;
-
-            if (!name || !email || !password) {
-                alert("Please fill in all fields.");
-                return;
-            }
-
-            try {
-                const res = await auth.createUserWithEmailAndPassword(email, password);
-                await db.collection("users").doc(res.user.uid).set({
-                    name: name,
-                    email: email,
-                    role: "student",
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                alert("Registration Successful! Please login.");
-                document.getElementById("registerForm").reset();
-                switchAuthMode('login'); 
-            } catch (err) {
-                alert("Registration Failed: " + err.message);
-            }
-        };
-    }
-
-    // Login Button Handler
-    const loginSubmitBtn = document.getElementById("loginSubmitBtn");
-    if (loginSubmitBtn) {
-        loginSubmitBtn.onclick = async function () {
-            const email = document.getElementById("loginEmail").value.trim();
-            const password = document.getElementById("loginPassword").value;
-
-            if (!email || !password) {
-                alert("Please enter email and password.");
-                return;
-            }
-
-            try {
-                await auth.signInWithEmailAndPassword(email, password);
-                alert("Login Successful!");
-            } catch (err) {
-                alert("Login Failed: " + err.message);
-            }
-        };
-    }
-
-    // Admin Login Button Handler
-    const adminSubmitBtn = document.getElementById("adminSubmitBtn");
-    if (adminSubmitBtn) {
-        adminSubmitBtn.onclick = async function () {
-            const email = document.getElementById("adminEmail").value.trim();
-            const password = document.getElementById("adminPassword").value;
-            const secretKey = document.getElementById("adminKeyInput").value;
-
-            if (secretKey !== SECRET_ADMIN_KEY) {
-                alert("Invalid Secret Admin Key!");
-                return;
-            }
-
-            try {
-                const res = await auth.signInWithEmailAndPassword(email, password);
-                await db.collection("users").doc(res.user.uid).set({
-                    name: "Admin",
-                    email: email,
-                    role: "admin"
-                }, { merge: true });
-                alert("Admin Login Successful!");
-            } catch (err) {
-                alert("Admin Login Failed: " + err.message);
-            }
-        };
-    }
-
-    // Forgot Password Button Handler
-    const forgotSubmitBtn = document.getElementById("forgotSubmitBtn");
-    if (forgotSubmitBtn) {
-        forgotSubmitBtn.onclick = async function (e) {
-            const email = document.getElementById("forgotEmail").value.trim();
-            try {
-                await auth.sendPasswordResetEmail(email);
-                alert("Password reset link sent to your email!");
-                document.getElementById("forgotForm").reset();
-                toggleForgotView(e);
-            } catch (err) {
-                alert("Error: " + err.message);
-            }
-        };
-    }
-
-    // User Share Form Button Handler
-    const userShareSubmitBtn = document.getElementById("userShareSubmitBtn");
-    if (userShareSubmitBtn) {
-        userShareSubmitBtn.onclick = function () {
-            saveMaterialToDatabase("userMatYear", "userMatSem", "userMatSubject", "userMatCategory", "userMatTitle", "userMatUrl");
-            document.getElementById("userShareForm").reset();
-        };
-    }
-
-    // Admin Add Material Button Handler
-    const adminShareSubmitBtn = document.getElementById("adminShareSubmitBtn");
-    if (adminShareSubmitBtn) {
-        adminShareSubmitBtn.onclick = function () {
-            saveMaterialToDatabase("adminMatYear", "adminMatSem", "adminMatSubject", "adminMatCategory", "adminMatTitle", "adminMatUrl");
-            document.getElementById("addMaterialForm").reset();
-        };
-    }
+function logoutUser() {
+    localStorage.removeItem("active_user");
+    currentUser = null;
+    checkInitialAuthFlow();
 }
 
-// Navigation & Syllabus Logic
+function hideAllViews() {
+    const views = [
+        "courseSelectionView", 
+        "semesterSelectionView", 
+        "subjectSelectionView", 
+        "materialsDetailView", 
+        "userUploadView", 
+        "userDownloadsView", 
+        "adminPanelView"
+    ];
+    views.forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.add("hidden");
+    });
+}
+
 function showHome() {
     hideAllViews();
-    document.getElementById("courseSelectionView").classList.remove("hidden");
+    const homeView = document.getElementById("courseSelectionView");
+    if (homeView) homeView.classList.remove("hidden");
 }
 
+function openUserUploadPanel() {
+    hideAllViews();
+    const uploadView = document.getElementById("userUploadView");
+    if (uploadView) uploadView.classList.remove("hidden");
+}
+
+function openUserDownloads() {
+    hideAllViews();
+    const dlView = document.getElementById("userDownloadsView");
+    if (dlView) dlView.classList.remove("hidden");
+    renderUserDownloads();
+}
+
+function openAdminPanel() {
+    hideAllViews();
+    const adminView = document.getElementById("adminPanelView");
+    if (adminView) adminView.classList.remove("hidden");
+    renderAdminMaterialsList();
+}
+
+// Academic Flow Navigation
 function openYear(yearKey) {
     currentSelectedYear = yearKey;
     hideAllViews();
     document.getElementById("semesterSelectionView").classList.remove("hidden");
-    
-    const yearData = bcomCaSyllabus[yearKey];
-    document.getElementById("selectedYearTitle").textContent = `${yearData.title} - Select Semester`;
-    
+    document.getElementById("selectedYearTitle").innerText = bcomCaSyllabus[yearKey].title + " - Select Semester";
+
     const semGrid = document.getElementById("semesterGrid");
     semGrid.innerHTML = "";
-
-    for (const [semKey, semVal] of Object.entries(yearData.semesters)) {
-        const card = document.createElement("div");
-        card.className = "course-card";
-        card.onclick = function() { openSemester(semKey); };
-        card.innerHTML = `
-            <i class="fa-solid fa-bookmark course-icon"></i>
-            <h3>${semVal.title}</h3>
-            <p>Access subjects and notes</p>
-            <button type="button" class="explore-btn">Open Semester <i class="fa-solid fa-arrow-right"></i></button>
+    
+    const sems = bcomCaSyllabus[yearKey].semesters;
+    for (let semKey in sems) {
+        const semObj = sems[semKey];
+        semGrid.innerHTML += `
+            <div class="course-card" onclick="openSemester('${semKey}')">
+                <i class="fa-solid fa-bookmark course-icon"></i>
+                <h3>${semObj.title}</h3>
+                <p>Explore Subjects & Materials</p>
+                <button type="button" class="explore-btn">Open Semester <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
         `;
-        semGrid.appendChild(card);
     }
-}
-
-function openSemester(semKey) {
-    currentSelectedSem = semKey;
-    hideAllViews();
-    document.getElementById("subjectSelectionView").classList.remove("hidden");
-
-    const semData = bcomCaSyllabus[currentSelectedYear].semesters[semKey];
-    document.getElementById("selectedSemTitle").textContent = `${semData.title} - Select Subject`;
-
-    const subGrid = document.getElementById("subjectGrid");
-    subGrid.innerHTML = "";
-
-    semData.subjects.forEach(subj => {
-        const card = document.createElement("div");
-        card.className = "subject-card";
-        card.onclick = function() { openSubject(subj.name); };
-        card.innerHTML = `
-            <i class="fa-solid fa-book-bookmark" style="font-size:2rem; color:#0284c7; margin-bottom:10px;"></i>
-            <h3>${subj.name}</h3>
-            <p>${subj.isPractical ? 'Practical / Lab Subject' : 'Theory Subject'}</p>
-        `;
-        subGrid.appendChild(card);
-    });
-}
-
-function openSubject(subjectName) {
-    currentSelectedSubject = subjectName;
-    hideAllViews();
-    document.getElementById("materialsDetailView").classList.remove("hidden");
-    document.getElementById("selectedSubjectTitle").textContent = subjectName;
-    renderSubjectMaterials(currentSelectedYear, currentSelectedSem, subjectName);
 }
 
 function backToSemesters() {
     openYear(currentSelectedYear);
 }
 
+function openSemester(semKey) {
+    currentSelectedSem = semKey;
+    hideAllViews();
+    document.getElementById("subjectSelectionView").classList.remove("hidden");
+    document.getElementById("selectedSemTitle").innerText = "Select Subject";
+
+    const subGrid = document.getElementById("subjectGrid");
+    subGrid.innerHTML = "";
+
+    const subjects = bcomCaSyllabus[currentSelectedYear].semesters[semKey].subjects;
+    subjects.forEach(sub => {
+        subGrid.innerHTML += `
+            <div class="course-card" onclick="openSubject('${sub.name}')">
+                <i class="fa-solid fa-book course-icon"></i>
+                <h3>${sub.name}</h3>
+                <p>${sub.isPractical ? 'Practical & Theory Notes' : 'Theory & Question Papers'}</p>
+                <button type="button" class="explore-btn">View Materials <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+        `;
+    });
+}
+
 function backToSubjects() {
     openSemester(currentSelectedSem);
 }
 
-function populateFormSemesters(yearSelectId, semSelectId, subjSelectId) {
-    const yearKey = document.getElementById(yearSelectId).value;
-    const semSelect = document.getElementById(semSelectId);
-    semSelect.innerHTML = '<option value="">2. Select Semester</option>';
-    document.getElementById(subjSelectId).innerHTML = '<option value="">3. Select Subject</option>';
+function openSubject(subjectName) {
+    currentSelectedSubject = subjectName;
+    hideAllViews();
+    document.getElementById("materialsDetailView").classList.remove("hidden");
+    document.getElementById("selectedSubjectTitle").innerText = subjectName + " - Study Materials";
 
-    if (!yearKey) return;
-    const sems = bcomCaSyllabus[yearKey].semesters;
-    for (const [key, val] of Object.entries(sems)) {
-        semSelect.innerHTML += `<option value="${key}">${val.title}</option>`;
-    }
+    renderSubjectMaterials(currentSelectedYear, currentSelectedSem, subjectName);
 }
 
-function populateFormSubjects(yearSelectId, semSelectId, subjSelectId) {
-    const yearKey = document.getElementById(yearSelectId).value;
-    const semKey = document.getElementById(semSelectId).value;
-    const subjSelect = document.getElementById(subjSelectId);
-    subjSelect.innerHTML = '<option value="">3. Select Subject</option>';
+function renderSubjectMaterials(year, sem, subject) {
+    const grid = document.getElementById("materialsGrid");
+    grid.innerHTML = "";
 
-    if (!yearKey || !semKey) return;
-    const subs = bcomCaSyllabus[yearKey].semesters[semKey].subjects;
-    subs.forEach(s => {
-        subjSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
-    });
-}
+    const allMaterials = getLocalData("study_suppliers_materials");
+    const filtered = allMaterials.filter(m => m.year === year && m.sem === sem && m.subject === subject);
 
-function populateCategories(yearSelectId, semSelectId, subjSelectId, catSelectId) {
-    const catSelect = document.getElementById(catSelectId);
-    catSelect.innerHTML = `
-        <option value="">4. Select Category</option>
-        <option value="Notes">Notes / Unit Material</option>
-        <option value="Question Papers">Question Papers</option>
-        <option value="Practical Slips">Practical Slips / Code</option>
-        <option value="Reference Books">Reference Books</option>
-    `;
-}
-
-// Global PDF Save Function (Firebase Firestore - Visible to All Visitors)
-async function saveMaterialToDatabase(yId, sId, subjId, catId, titleId, urlId) {
-    const year = document.getElementById(yId).value;
-    const sem = document.getElementById(sId).value;
-    const subject = document.getElementById(subjId).value;
-    const category = document.getElementById(catId).value;
-    const title = document.getElementById(titleId).value.trim();
-    const url = document.getElementById(urlId).value.trim();
-
-    if (!year || !sem || !subject || !category || !title || !url) {
-        alert("Please fill all fields and provide a valid link.");
+    if (filtered.length === 0) {
+        grid.innerHTML = `<p class="empty-msg">No study materials uploaded for this subject yet.</p>`;
         return;
     }
 
-    try {
-        await db.collection("materials").add({
-            year, sem, subject, category, title, url,
-            uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            uploadedBy: currentUser ? currentUser.email : "Guest"
-        });
-
-        alert("PDF Material Added Successfully! It is now live and visible to ALL website visitors.");
-        if (currentSelectedSubject === subject) {
-            renderSubjectMaterials(year, sem, subject);
-        }
-    } catch (err) {
-        alert("Upload Failed: " + err.message);
-    }
-}
-
-// Live PDF Materials Fetch Function (Global)
-async function renderSubjectMaterials(yearKey, semKey, subjectName) {
-    const grid = document.getElementById("materialsGrid");
-    grid.innerHTML = "<p style='text-align:center;'>Loading live materials from database...</p>";
-
-    try {
-        const snapshot = await db.collection("materials")
-            .where("year", "==", yearKey)
-            .where("sem", "==", semKey)
-            .where("subject", "==", subjectName)
-            .get();
-
-        grid.innerHTML = "";
-        if (snapshot.empty) {
-            grid.innerHTML = `<div style="text-align:center; padding:30px;"><b>No PDFs uploaded for ${subjectName} yet. Be the first to upload!</b></div>`;
-            return;
-        }
-
-        snapshot.forEach(doc => {
-            const item = doc.data();
-            const { previewUrl, downloadUrl } = processPdfUrls(item.url);
-            const card = document.createElement("div");
-            card.className = "pdf-item-card";
-            card.innerHTML = `
-                <div class="pdf-item-header">
-                    <div><i class="fa-solid fa-file-pdf" style="color:#e11d48;"></i> <b>${item.title}</b> (${item.category})</div>
-                    <div class="pdf-action-btns">
-                        <a href="${previewUrl}" target="_blank" class="action-btn btn-open" onclick="logActivity('Viewed PDF: ${item.title}')">View</a>
-                        <a href="${downloadUrl}" target="_blank" class="action-btn btn-download" onclick="logActivity('Downloaded PDF: ${item.title}')">Download</a>
-                        <button type="button" class="action-btn" style="background:#0284c7; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick='saveToMyDownloads(${JSON.stringify(item)})'>Save</button>
-                    </div>
+    filtered.forEach(mat => {
+        grid.innerHTML += `
+            <div class="material-card" style="background:#fff; padding:15px; margin-bottom:10px; border-radius:8px; border:1px solid #cbd5e1;">
+                <h4>${mat.title}</h4>
+                <p style="font-size:0.85rem; color:#64748b;">Category: ${mat.category} | Uploaded by: ${mat.uploadedBy}</p>
+                <div style="margin-top:10px;">
+                    <a href="${mat.url}" target="_blank" class="submit-btn" style="display:inline-block; text-decoration:none; padding:8px 15px;" onclick="logActivity('${mat.title}')">Open / Download PDF</a>
+                    <button type="button" onclick='savePdfToUserList(${JSON.stringify(mat)})' class="submit-btn" style="background:#0ea5e9; display:inline-block; margin-left:10px; padding:8px 15px;">Save to My PDFs</button>
                 </div>
-                <iframe src="${previewUrl}" width="100%" height="300" style="margin-top:10px; border-radius:6px; border:1px solid #cbd5e1;"></iframe>
-            `;
-            grid.appendChild(card);
-        });
-    } catch (err) {
-        grid.innerHTML = "<p>Error loading materials: " + err.message + "</p>";
+            </div>
+        `;
+    });
+}
+
+// Form Dropdown Dynamic Populators
+function populateFormSemesters(yearId, semId, subId) {
+    const year = document.getElementById(yearId).value;
+    const semSelect = document.getElementById(semId);
+    semSelect.innerHTML = `<option value="">2. Select Semester</option>`;
+    
+    if (!year) return;
+
+    const sems = bcomCaSyllabus[year].semesters;
+    for (let key in sems) {
+        semSelect.innerHTML += `<option value="${key}">${sems[key].title}</option>`;
     }
 }
 
-function processPdfUrls(rawUrl) {
-    let previewUrl = rawUrl;
-    let downloadUrl = rawUrl;
-    if (rawUrl.includes("drive.google.com")) {
-        const match = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || rawUrl.match(/id=([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-            previewUrl = `https://drive.google.com/file/d/${match[1]}/preview`;
-            downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-        }
-    }
-    return { previewUrl, downloadUrl };
+function populateFormSubjects(yearId, semId, subId) {
+    const year = document.getElementById(yearId).value;
+    const sem = document.getElementById(semId).value;
+    const subSelect = document.getElementById(subId);
+    subSelect.innerHTML = `<option value="">3. Select Subject</option>`;
+
+    if (!year || !sem) return;
+
+    const subjects = bcomCaSyllabus[year].semesters[sem].subjects;
+    subjects.forEach(sub => {
+        subSelect.innerHTML += `<option value="${sub.name}">${sub.name}</option>`;
+    });
 }
 
-function saveToMyDownloads(item) {
-    if (!userSavedDownloads.some(d => d.title === item.title && d.url === item.url)) {
-        userSavedDownloads.push(item);
-        localStorage.setItem("studySuppliersDownloads", JSON.stringify(userSavedDownloads));
-        updateDownloadsBadge();
-        alert("PDF saved to 'My Saved PDFs' successfully!");
-        logActivity(`Saved PDF to local list: ${item.title}`);
+function populateCategories(yearId, semId, subId, catId) {
+    const catSelect = document.getElementById(catId);
+    catSelect.innerHTML = `
+        <option value="">4. Select Category</option>
+        <option value="Notes">Unit Notes</option>
+        <option value="Practical File">Practical File</option>
+        <option value="Question Paper">Question Paper</option>
+        <option value="Assignment">Assignment</option>
+    `;
+}
+
+// Activity Log & Downloads Management
+function logActivity(title) {
+    let history = getLocalData("study_suppliers_history");
+    history.unshift({ title, time: new Date().toLocaleTimeString() });
+    setLocalData("study_suppliers_history", history);
+    renderHistoryList();
+}
+
+function renderHistoryList() {
+    const list = document.getElementById("historyList");
+    const countEl = document.getElementById("downloadCount");
+    let history = getLocalData("study_suppliers_history");
+
+    if (countEl) countEl.innerText = history.length;
+    if (!list) return;
+
+    if (history.length === 0) {
+        list.innerHTML = `<li class="empty-msg">No activity recorded.</li>`;
+        return;
+    }
+
+    list.innerHTML = "";
+    history.forEach(item => {
+        list.innerHTML += `<li>Accessed: <b>${item.title}</b> <span style="font-size:0.75rem; color:#94a3b8;">(${item.time})</span></li>`;
+    });
+}
+
+function savePdfToUserList(mat) {
+    let saved = getLocalData("study_suppliers_saved_pdfs");
+    if (!saved.some(s => s.id === mat.id)) {
+        saved.push(mat);
+        setLocalData("study_suppliers_saved_pdfs", saved);
+        updateDownloadBadgeCount();
+        alert("PDF saved to your library!");
     } else {
-        alert("This PDF is already in your saved list.");
+        alert("PDF already exists in your saved list.");
     }
 }
 
-function openUserDownloads() {
-    hideAllViews();
-    document.getElementById("userDownloadsView").classList.remove("hidden");
-    const grid = document.getElementById("userDownloadsGrid");
-    grid.innerHTML = "";
+function updateDownloadBadgeCount() {
+    let saved = getLocalData("study_suppliers_saved_pdfs");
+    const badge = document.getElementById("dlNavBadge");
+    if (badge) badge.innerText = saved.length;
+}
 
-    if (userSavedDownloads.length === 0) {
-        grid.innerHTML = "<p style='text-align:center; padding:30px;'>No saved PDFs fo
+function renderUserDownloads() {
