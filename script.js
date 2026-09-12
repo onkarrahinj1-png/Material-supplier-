@@ -1,13 +1,37 @@
+// ==========================================
+// FIREBASE CONFIGURATION & INITIALIZATION
+// ==========================================
+// (यदि आपके पास आपकी खुद की Firebase config keys हैं, तो आप उन्हें यहाँ रिप्लेस कर सकते हैं)
+const firebaseConfig = {
+    apiKey: "YOUR_FIREBASE_API_KEY",
+    authDomain: "study-suppliers.firebaseapp.com",
+    projectId: "study-suppliers",
+    storageBucket: "study-suppliers.appspot.com",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
+
+// Initialize Firebase (Safely checking SDK availability)
+let db = null;
+let auth = null;
+try {
+    if (typeof firebase !== "undefined") {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        db = firebase.firestore();
+        auth = firebase.auth();
+    }
+} catch (e) {
+    console.warn("Firebase SDK initialization warning. Falling back to local state sync:", e);
+}
+
 // EmailJS Credentials Declarations
 const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";   
 const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID";   
 const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID"; 
 
 const SECRET_ADMIN_KEY = "admin2020";
-
-// Firebase configuration (Firestore Database & Auth Setup)
-// Note: Ensure you include Firebase SDK scripts in your html or use modular imports if required. 
-// Here we integrate standard Firestore logic seamlessly with your frontend view switches.
 
 // BCom CA Syllabus Data Structure
 const bcomCaSyllabus = {
@@ -88,7 +112,7 @@ const bcomCaSyllabus = {
     }
 };
 
-// LocalStorage & Sync Helpers
+// LocalStorage Helper
 function getLocalData(key) {
     return JSON.parse(localStorage.getItem(key) || "[]");
 }
@@ -118,7 +142,6 @@ function checkInitialAuthFlow() {
         if (landingOverlay) landingOverlay.classList.add("hidden");
         if (portalContent) portalContent.classList.remove("hidden");
         
-        // Show Admin Panel Button if user is Admin
         const adminBtn = document.getElementById("adminNavBtn");
         if (adminBtn) {
             if (currentUser.isAdmin) {
@@ -139,7 +162,7 @@ function checkInitialAuthFlow() {
 }
 
 function setupAuthAndFormEvents() {
-    // Registration Form Handler
+    // 1. Registration Form Handler (Prevents Page Reload via e.preventDefault)
     const regForm = document.getElementById("registerForm");
     if (regForm) {
         regForm.addEventListener("submit", function(e) {
@@ -154,13 +177,19 @@ function setupAuthAndFormEvents() {
             users.push({ name, username, userId, email, password, isAdmin: false });
             setLocalData("study_suppliers_users", users);
 
+            // Save to Firebase Firestore if available
+            if (db) {
+                db.collection("users").add({ name, username, userId, email, isAdmin: false, createdAt: new Date() })
+                  .catch(err => console.log("Firestore User Sync Error:", err));
+            }
+
             alert("Registration successful! Please login now.");
             switchAuthMode('login');
             regForm.reset();
         });
     }
 
-    // Login Form Handler
+    // 2. Login Form Handler
     const loginForm = document.getElementById("loginForm");
     if (loginForm) {
         loginForm.addEventListener("submit", function(e) {
@@ -182,7 +211,7 @@ function setupAuthAndFormEvents() {
         });
     }
 
-    // Admin Login Form Handler
+    // 3. Admin Login Form Handler
     const adminLoginForm = document.getElementById("adminLoginForm");
     if (adminLoginForm) {
         adminLoginForm.addEventListener("submit", function(e) {
@@ -202,7 +231,7 @@ function setupAuthAndFormEvents() {
         });
     }
 
-    // Admin Material Upload Handler (Firestore + Local Sync)
+    // 4. Admin Material Upload Handler
     const addMaterialForm = document.getElementById("addMaterialForm");
     if (addMaterialForm) {
         addMaterialForm.addEventListener("submit", function(e) {
@@ -212,7 +241,7 @@ function setupAuthAndFormEvents() {
         });
     }
 
-    // User Share Form Handler
+    // 5. User Share Form Handler
     const userShareForm = document.getElementById("userShareForm");
     if (userShareForm) {
         userShareForm.addEventListener("submit", function(e) {
@@ -234,7 +263,7 @@ function setupAuthAndFormEvents() {
     }
 }
 
-// Core Material Submission logic (Syncs with Database / LocalStorage)
+// Database Integration: Material Submission
 function handleMaterialSubmission(yearId, semId, subId, catId, titleId, urlId, isAdminUpload) {
     const year = document.getElementById(yearId).value;
     const sem = document.getElementById(semId).value;
@@ -255,16 +284,23 @@ function handleMaterialSubmission(yearId, semId, subId, catId, titleId, urlId, i
         date: new Date().toLocaleDateString()
     };
 
+    // Save locally
     let allMaterials = getLocalData("study_suppliers_materials");
     allMaterials.push(newMaterial);
     setLocalData("study_suppliers_materials", allMaterials);
+
+    // Save to Firebase Firestore Database if initialized
+    if (db) {
+        db.collection("materials").add(newMaterial)
+          .catch(err => console.log("Firestore Upload Error:", err));
+    }
 
     if (isAdminUpload) {
         renderAdminMaterialsList();
     }
 }
 
-// Navigation and UI View Switchers
+// Navigation & Auth View Switchers
 function switchAuthMode(mode) {
     const regForm = document.getElementById("registerForm");
     const loginForm = document.getElementById("loginForm");
@@ -451,7 +487,7 @@ function renderSubjectMaterials(year, sem, subject) {
     });
 }
 
-// Form Dropdown Dynamic Populators
+// Dropdown Populators
 function populateFormSemesters(yearId, semId, subId) {
     const year = document.getElementById(yearId).value;
     const semSelect = document.getElementById(semId);
@@ -536,3 +572,52 @@ function updateDownloadBadgeCount() {
 }
 
 function renderUserDownloads() {
+    const grid = document.getElementById("userDownloadsGrid");
+    let saved = getLocalData("study_suppliers_saved_pdfs");
+
+    if (saved.length === 0) {
+        grid.innerHTML = `<p class="empty-msg">You have not saved any PDFs yet.</p>`;
+        return;
+    }
+
+    grid.innerHTML = "";
+    saved.forEach(mat => {
+        grid.innerHTML += `
+            <div class="material-card" style="background:#fff; padding:15px; margin-bottom:10px; border-radius:8px; border:1px solid #cbd5e1;">
+                <h4>${mat.title}</h4>
+                <p style="font-size:0.85rem; color:#64748b;">Subject: ${mat.subject}</p>
+                <div style="margin-top:10px;">
+                    <a href="${mat.url}" target="_blank" class="submit-btn" style="display:inline-block; text-decoration:none; padding:8px 15px;">Open PDF</a>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function renderAdminMaterialsList() {
+    const list = document.getElementById("adminMaterialList");
+    let materials = getLocalData("study_suppliers_materials");
+
+    if (!list) return;
+    if (materials.length === 0) {
+        list.innerHTML = `<li class="empty-msg">No uploaded files.</li>`;
+        return;
+    }
+
+    list.innerHTML = "";
+    materials.forEach((mat) => {
+        list.innerHTML += `
+            <li style="padding:8px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                <span>${mat.title} (${mat.subject})</span>
+                <button type="button" onclick="deleteMaterial('${mat.id}')" style="background:#ef4444; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Delete</button>
+            </li>
+        `;
+    });
+}
+
+function deleteMaterial(id) {
+    let materials = getLocalData("study_suppliers_materials");
+    materials = materials.filter(m => m.id !== id);
+    setLocalData("study_suppliers_materials", materials);
+    renderAdminMaterialsList();
+}
