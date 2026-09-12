@@ -1,4 +1,4 @@
-// 1. Firebase Configuration
+// 1. Firebase Configuration (Project: study-suppliers)
 const firebaseConfig = {
     apiKey: "AIzaSyALrGK6yYtpORV5jHvANzpAi0WwPTPUqFI",
     authDomain: "study-suppliers.firebaseapp.com",
@@ -72,7 +72,6 @@ document.addEventListener("DOMContentLoaded", function () {
     updateDownloadsBadge();
     renderActivityLogs();
 
-    // Clear History Button Event
     const clearBtn = document.getElementById("clearHistoryBtn");
     if (clearBtn) {
         clearBtn.onclick = function() {
@@ -122,7 +121,7 @@ function switchAuthMode(mode) {
 }
 
 function toggleForgotView(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const loginForm = document.getElementById("loginForm");
     const forgotForm = document.getElementById("forgotForm");
     const authTabs = document.getElementById("mainAuthTabs");
@@ -139,7 +138,7 @@ function toggleForgotView(e) {
 }
 
 function openAdminModal(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     document.getElementById("loginForm").classList.add("hidden");
     document.getElementById("registerForm").classList.add("hidden");
     document.getElementById("forgotForm").classList.add("hidden");
@@ -148,7 +147,7 @@ function openAdminModal(e) {
 }
 
 function closeAdminModal(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     document.getElementById("adminLoginForm").classList.add("hidden");
     switchAuthMode('login');
 }
@@ -169,11 +168,11 @@ function updateUserStatusUI() {
     }
 }
 
+// Robust Event Binding with PreventDefault for ALL Forms
 function setupAuthAndFormEvents() {
-    // 1. Live Registration with Firebase
     const regForm = document.getElementById("registerForm");
     if (regForm) {
-        regForm.onsubmit = async function (e) {
+        regForm.addEventListener("submit", async function (e) {
             e.preventDefault();
             const name = document.getElementById("regName").value.trim();
             const email = document.getElementById("regEmail").value.trim();
@@ -194,13 +193,12 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Registration Failed: " + err.message);
             }
-        };
+        });
     }
 
-    // 2. Live Login with Firebase
     const loginForm = document.getElementById("loginForm");
     if (loginForm) {
-        loginForm.onsubmit = async function (e) {
+        loginForm.addEventListener("submit", async function (e) {
             e.preventDefault();
             const email = document.getElementById("loginEmail").value.trim();
             const password = document.getElementById("loginPassword").value;
@@ -211,13 +209,12 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Login Failed: " + err.message);
             }
-        };
+        });
     }
 
-    // 3. Admin Login Event
     const adminLoginForm = document.getElementById("adminLoginForm");
     if (adminLoginForm) {
-        adminLoginForm.onsubmit = async function (e) {
+        adminLoginForm.addEventListener("submit", async function (e) {
             e.preventDefault();
             const email = document.getElementById("adminEmail").value.trim();
             const password = document.getElementById("adminPassword").value;
@@ -239,13 +236,12 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Admin Login Failed: " + err.message);
             }
-        };
+        });
     }
 
-    // 4. Forgot Password Event
     const forgotForm = document.getElementById("forgotForm");
     if (forgotForm) {
-        forgotForm.onsubmit = async function (e) {
+        forgotForm.addEventListener("submit", async function (e) {
             e.preventDefault();
             const email = document.getElementById("forgotEmail").value.trim();
             try {
@@ -256,31 +252,29 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Error: " + err.message);
             }
-        };
+        });
     }
 
-    // 5. User & Admin PDF Upload Events
     const userShareForm = document.getElementById("userShareForm");
     if (userShareForm) {
-        userShareForm.onsubmit = function (e) {
+        userShareForm.addEventListener("submit", function (e) {
             e.preventDefault();
             saveMaterialToDatabase("userMatYear", "userMatSem", "userMatSubject", "userMatCategory", "userMatTitle", "userMatUrl");
             userShareForm.reset();
-        };
+        });
     }
 
     const addMaterialForm = document.getElementById("addMaterialForm");
     if (addMaterialForm) {
-        addMaterialForm.onsubmit = function (e) {
+        addMaterialForm.addEventListener("submit", function (e) {
             e.preventDefault();
             saveMaterialToDatabase("adminMatYear", "adminMatSem", "adminMatSubject", "adminMatCategory", "adminMatTitle", "adminMatUrl");
             addMaterialForm.reset();
-        };
+        });
     }
 }
 
-// ================= NAVIGATION & SYLLABUS LOGIC (FIXED) =================
-
+// Navigation & Syllabus Logic
 function showHome() {
     hideAllViews();
     document.getElementById("courseSelectionView").classList.remove("hidden");
@@ -351,7 +345,6 @@ function backToSubjects() {
     openSemester(currentSelectedSem);
 }
 
-// Dropdown Populate Helpers for Forms
 function populateFormSemesters(yearSelectId, semSelectId, subjSelectId) {
     const yearKey = document.getElementById(yearSelectId).value;
     const semSelect = document.getElementById(semSelectId);
@@ -389,7 +382,7 @@ function populateCategories(yearSelectId, semSelectId, subjSelectId, catSelectId
     `;
 }
 
-// Global PDF Save Function (Firebase Firestore)
+// Global PDF Save Function (Firebase Firestore - Visible to All Users)
 async function saveMaterialToDatabase(yId, sId, subjId, catId, titleId, urlId) {
     const year = document.getElementById(yId).value;
     const sem = document.getElementById(sId).value;
@@ -405,7 +398,7 @@ async function saveMaterialToDatabase(yId, sId, subjId, catId, titleId, urlId) {
             uploadedBy: currentUser ? currentUser.email : "Guest"
         });
 
-        alert("PDF Material Added! It is now visible to ALL website visitors.");
+        alert("PDF Material Added Successfully! It is now live and visible to ALL website visitors.");
         if (currentSelectedSubject === subject) {
             renderSubjectMaterials(year, sem, subject);
         }
@@ -414,10 +407,10 @@ async function saveMaterialToDatabase(yId, sId, subjId, catId, titleId, urlId) {
     }
 }
 
-// Live PDF Materials Fetch Function
+// Live PDF Materials Fetch Function (Global)
 async function renderSubjectMaterials(yearKey, semKey, subjectName) {
     const grid = document.getElementById("materialsGrid");
-    grid.innerHTML = "<p style='text-align:center;'>Loading live materials...</p>";
+    grid.innerHTML = "<p style='text-align:center;'>Loading live materials from database...</p>";
 
     try {
         const snapshot = await db.collection("materials")
@@ -428,7 +421,7 @@ async function renderSubjectMaterials(yearKey, semKey, subjectName) {
 
         grid.innerHTML = "";
         if (snapshot.empty) {
-            grid.innerHTML = `<div style="text-align:center; padding:30px;"><b>No PDFs uploaded for ${subjectName} yet.</b></div>`;
+            grid.innerHTML = `<div style="text-align:center; padding:30px;"><b>No PDFs uploaded for ${subjectName} yet. Be the first to upload!</b></div>`;
             return;
         }
 
@@ -499,4 +492,4 @@ function openUserDownloads() {
             <div class="pdf-item-header">
                 <div><i class="fa-solid fa-file-pdf" style="color:#e11d48;"></i> <b>${item.title}</b> (${item.category || 'General'})</div>
                 <div class="pdf-action-btns">
-                    <a href="${previewUrl}" target="_blank" class="act
+                    <a href="${previewUrl}" target="_blank" class=
