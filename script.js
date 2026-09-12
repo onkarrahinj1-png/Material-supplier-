@@ -1,4 +1,4 @@
-// 1. Firebase Configuration (Project: study-suppliers)
+// 1. Firebase Configuration (New Project: study-suppliers)
 const firebaseConfig = {
     apiKey: "AIzaSyALrGK6yYtpORV5jHvANzpAi0WwPTPUqFI",
     authDomain: "study-suppliers.firebaseapp.com",
@@ -168,11 +168,11 @@ function updateUserStatusUI() {
     }
 }
 
-// Robust Event Binding with PreventDefault for ALL Forms
+// Form Submission Handlers with preventDefault
 function setupAuthAndFormEvents() {
     const regForm = document.getElementById("registerForm");
     if (regForm) {
-        regForm.addEventListener("submit", async function (e) {
+        regForm.onsubmit = async function (e) {
             e.preventDefault();
             const name = document.getElementById("regName").value.trim();
             const email = document.getElementById("regEmail").value.trim();
@@ -193,12 +193,12 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Registration Failed: " + err.message);
             }
-        });
+        };
     }
 
     const loginForm = document.getElementById("loginForm");
     if (loginForm) {
-        loginForm.addEventListener("submit", async function (e) {
+        loginForm.onsubmit = async function (e) {
             e.preventDefault();
             const email = document.getElementById("loginEmail").value.trim();
             const password = document.getElementById("loginPassword").value;
@@ -209,12 +209,12 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Login Failed: " + err.message);
             }
-        });
+        };
     }
 
     const adminLoginForm = document.getElementById("adminLoginForm");
     if (adminLoginForm) {
-        adminLoginForm.addEventListener("submit", async function (e) {
+        adminLoginForm.onsubmit = async function (e) {
             e.preventDefault();
             const email = document.getElementById("adminEmail").value.trim();
             const password = document.getElementById("adminPassword").value;
@@ -236,12 +236,12 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Admin Login Failed: " + err.message);
             }
-        });
+        };
     }
 
     const forgotForm = document.getElementById("forgotForm");
     if (forgotForm) {
-        forgotForm.addEventListener("submit", async function (e) {
+        forgotForm.onsubmit = async function (e) {
             e.preventDefault();
             const email = document.getElementById("forgotEmail").value.trim();
             try {
@@ -252,25 +252,25 @@ function setupAuthAndFormEvents() {
             } catch (err) {
                 alert("Error: " + err.message);
             }
-        });
+        };
     }
 
     const userShareForm = document.getElementById("userShareForm");
     if (userShareForm) {
-        userShareForm.addEventListener("submit", function (e) {
+        userShareForm.onsubmit = function (e) {
             e.preventDefault();
             saveMaterialToDatabase("userMatYear", "userMatSem", "userMatSubject", "userMatCategory", "userMatTitle", "userMatUrl");
             userShareForm.reset();
-        });
+        };
     }
 
     const addMaterialForm = document.getElementById("addMaterialForm");
     if (addMaterialForm) {
-        addMaterialForm.addEventListener("submit", function (e) {
+        addMaterialForm.onsubmit = function (e) {
             e.preventDefault();
             saveMaterialToDatabase("adminMatYear", "adminMatSem", "adminMatSubject", "adminMatCategory", "adminMatTitle", "adminMatUrl");
             addMaterialForm.reset();
-        });
+        };
     }
 }
 
@@ -382,7 +382,7 @@ function populateCategories(yearSelectId, semSelectId, subjSelectId, catSelectId
     `;
 }
 
-// Global PDF Save Function (Firebase Firestore - Visible to All Users)
+// Global PDF Save Function (Firebase Firestore - Visible to All)
 async function saveMaterialToDatabase(yId, sId, subjId, catId, titleId, urlId) {
     const year = document.getElementById(yId).value;
     const sem = document.getElementById(sId).value;
@@ -492,4 +492,5 @@ function openUserDownloads() {
             <div class="pdf-item-header">
                 <div><i class="fa-solid fa-file-pdf" style="color:#e11d48;"></i> <b>${item.title}</b> (${item.category || 'General'})</div>
                 <div class="pdf-action-btns">
-                    <a href="${previewUrl}" target="_blank" class=
+                    <a href="${previewUrl}" target="_blank" class="action-btn btn-open">View</a>
+                    <a href="${downloadUrl}" target="_blank" class="action-btn btn-
