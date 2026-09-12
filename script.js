@@ -1,4 +1,4 @@
-// 1. Firebase Configuration (New Project: study-suppliers)
+// 1. Firebase Configuration (Project: study-suppliers)
 const firebaseConfig = {
     apiKey: "AIzaSyALrGK6yYtpORV5jHvANzpAi0WwPTPUqFI",
     authDomain: "study-suppliers.firebaseapp.com",
@@ -18,7 +18,7 @@ const db = firebase.firestore();
 
 const SECRET_ADMIN_KEY = "admin2020";
 
-// BCom CA Syllabus Data Structure
+// BCom CA Syllabus Data Structure (FY, SY, TY with Semesters and Subjects)
 const bcomCaSyllabus = {
     fy: {
         title: "FY BCom CA",
@@ -168,15 +168,20 @@ function updateUserStatusUI() {
     }
 }
 
-// Form Submission Handlers with preventDefault
+// Form Handlers with Zero Page Reload
 function setupAuthAndFormEvents() {
-    const regForm = document.getElementById("registerForm");
-    if (regForm) {
-        regForm.onsubmit = async function (e) {
-            e.preventDefault();
+    // Register Button Handler
+    const regSubmitBtn = document.getElementById("regSubmitBtn");
+    if (regSubmitBtn) {
+        regSubmitBtn.onclick = async function () {
             const name = document.getElementById("regName").value.trim();
             const email = document.getElementById("regEmail").value.trim();
             const password = document.getElementById("regPassword").value;
+
+            if (!name || !email || !password) {
+                alert("Please fill in all fields.");
+                return;
+            }
 
             try {
                 const res = await auth.createUserWithEmailAndPassword(email, password);
@@ -188,7 +193,7 @@ function setupAuthAndFormEvents() {
                 });
 
                 alert("Registration Successful! Please login.");
-                regForm.reset();
+                document.getElementById("registerForm").reset();
                 switchAuthMode('login'); 
             } catch (err) {
                 alert("Registration Failed: " + err.message);
@@ -196,12 +201,17 @@ function setupAuthAndFormEvents() {
         };
     }
 
-    const loginForm = document.getElementById("loginForm");
-    if (loginForm) {
-        loginForm.onsubmit = async function (e) {
-            e.preventDefault();
+    // Login Button Handler
+    const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+    if (loginSubmitBtn) {
+        loginSubmitBtn.onclick = async function () {
             const email = document.getElementById("loginEmail").value.trim();
             const password = document.getElementById("loginPassword").value;
+
+            if (!email || !password) {
+                alert("Please enter email and password.");
+                return;
+            }
 
             try {
                 await auth.signInWithEmailAndPassword(email, password);
@@ -212,10 +222,10 @@ function setupAuthAndFormEvents() {
         };
     }
 
-    const adminLoginForm = document.getElementById("adminLoginForm");
-    if (adminLoginForm) {
-        adminLoginForm.onsubmit = async function (e) {
-            e.preventDefault();
+    // Admin Login Button Handler
+    const adminSubmitBtn = document.getElementById("adminSubmitBtn");
+    if (adminSubmitBtn) {
+        adminSubmitBtn.onclick = async function () {
             const email = document.getElementById("adminEmail").value.trim();
             const password = document.getElementById("adminPassword").value;
             const secretKey = document.getElementById("adminKeyInput").value;
@@ -239,15 +249,15 @@ function setupAuthAndFormEvents() {
         };
     }
 
-    const forgotForm = document.getElementById("forgotForm");
-    if (forgotForm) {
-        forgotForm.onsubmit = async function (e) {
-            e.preventDefault();
+    // Forgot Password Button Handler
+    const forgotSubmitBtn = document.getElementById("forgotSubmitBtn");
+    if (forgotSubmitBtn) {
+        forgotSubmitBtn.onclick = async function (e) {
             const email = document.getElementById("forgotEmail").value.trim();
             try {
                 await auth.sendPasswordResetEmail(email);
                 alert("Password reset link sent to your email!");
-                forgotForm.reset();
+                document.getElementById("forgotForm").reset();
                 toggleForgotView(e);
             } catch (err) {
                 alert("Error: " + err.message);
@@ -255,21 +265,21 @@ function setupAuthAndFormEvents() {
         };
     }
 
-    const userShareForm = document.getElementById("userShareForm");
-    if (userShareForm) {
-        userShareForm.onsubmit = function (e) {
-            e.preventDefault();
+    // User Share Form Button Handler
+    const userShareSubmitBtn = document.getElementById("userShareSubmitBtn");
+    if (userShareSubmitBtn) {
+        userShareSubmitBtn.onclick = function () {
             saveMaterialToDatabase("userMatYear", "userMatSem", "userMatSubject", "userMatCategory", "userMatTitle", "userMatUrl");
-            userShareForm.reset();
+            document.getElementById("userShareForm").reset();
         };
     }
 
-    const addMaterialForm = document.getElementById("addMaterialForm");
-    if (addMaterialForm) {
-        addMaterialForm.onsubmit = function (e) {
-            e.preventDefault();
+    // Admin Add Material Button Handler
+    const adminShareSubmitBtn = document.getElementById("adminShareSubmitBtn");
+    if (adminShareSubmitBtn) {
+        adminShareSubmitBtn.onclick = function () {
             saveMaterialToDatabase("adminMatYear", "adminMatSem", "adminMatSubject", "adminMatCategory", "adminMatTitle", "adminMatUrl");
-            addMaterialForm.reset();
+            document.getElementById("addMaterialForm").reset();
         };
     }
 }
@@ -382,7 +392,7 @@ function populateCategories(yearSelectId, semSelectId, subjSelectId, catSelectId
     `;
 }
 
-// Global PDF Save Function (Firebase Firestore - Visible to All)
+// Global PDF Save Function (Firebase Firestore - Visible to All Visitors)
 async function saveMaterialToDatabase(yId, sId, subjId, catId, titleId, urlId) {
     const year = document.getElementById(yId).value;
     const sem = document.getElementById(sId).value;
@@ -390,6 +400,11 @@ async function saveMaterialToDatabase(yId, sId, subjId, catId, titleId, urlId) {
     const category = document.getElementById(catId).value;
     const title = document.getElementById(titleId).value.trim();
     const url = document.getElementById(urlId).value.trim();
+
+    if (!year || !sem || !subject || !category || !title || !url) {
+        alert("Please fill all fields and provide a valid link.");
+        return;
+    }
 
     try {
         await db.collection("materials").add({
@@ -480,17 +495,4 @@ function openUserDownloads() {
     grid.innerHTML = "";
 
     if (userSavedDownloads.length === 0) {
-        grid.innerHTML = "<p style='text-align:center; padding:30px;'>No saved PDFs found.</p>";
-        return;
-    }
-
-    userSavedDownloads.forEach((item, index) => {
-        const { previewUrl, downloadUrl } = processPdfUrls(item.url);
-        const card = document.createElement("div");
-        card.className = "pdf-item-card";
-        card.innerHTML = `
-            <div class="pdf-item-header">
-                <div><i class="fa-solid fa-file-pdf" style="color:#e11d48;"></i> <b>${item.title}</b> (${item.category || 'General'})</div>
-                <div class="pdf-action-btns">
-                    <a href="${previewUrl}" target="_blank" class="action-btn btn-open">View</a>
-                    <a href="${downloadUrl}" target="_blank" class="action-btn btn-
+        grid.innerHTML = "<p style='text-align:center; padding:30px;'>No saved PDFs fo
