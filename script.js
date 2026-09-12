@@ -1,14 +1,15 @@
-// 1. Firebase Configuration (अपने Firebase Console से यह Keys बदलें)
+// 1. Firebase Configuration (New Project: study-suppliers)
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyALrGK6yYtpORV5jHvANzpAi0WwPTPUqFI",
+    authDomain: "study-suppliers.firebaseapp.com",
+    projectId: "study-suppliers",
+    storageBucket: "study-suppliers.firebasestorage.app",
+    messagingSenderId: "1066506689674",
+    appId: "1:1066506689674:web:4ac7e331b0068a4329e173",
+    measurementId: "G-QBC1LFTM6S"
 };
 
-// Initialize Firebase
+// Initialize Firebase (Compat Version)
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
@@ -116,7 +117,7 @@ function updateUserStatusUI() {
 }
 
 function setupAuthAndFormEvents() {
-    // 1. Live Registration with Firebase
+    // 1. Live Registration with Firebase (No page refresh, auto-switch to login)
     document.getElementById("registerForm").onsubmit = async function (e) {
         e.preventDefault();
         const name = document.getElementById("regName").value.trim();
@@ -134,7 +135,7 @@ function setupAuthAndFormEvents() {
 
             alert("Registration Successful! Please login.");
             document.getElementById("registerForm").reset();
-            switchAuthMode('login'); // Smooth transition to login
+            switchAuthMode('login'); 
         } catch (err) {
             alert("Registration Failed: " + err.message);
         }
@@ -260,4 +261,4 @@ function showHome() {
 function hideAllViews() {
     const views = document.querySelectorAll(".view-section");
     views.forEach(v => v.classList.add("hidden"));
-    }
+}
